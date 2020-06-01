@@ -1,0 +1,1 @@
+[images, labels] = mnist_parse('train-images.idx3-ubyte','train-labels.idx1-ubyte');
