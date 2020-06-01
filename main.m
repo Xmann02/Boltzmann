@@ -1,3 +1,5 @@
+%Programm by Xmann02 and DontStealMyAccount
+%
 
 %% Global parameters
 
@@ -35,33 +37,67 @@ b = zeros(sizeH,1);
 
 
 
-%% Working area
+%% Working/Testing area
 
+
+% Temporary 
+A = images(:,:,1);
+v = vectorizeImage(A,28,28);
+k = 1;
+alpha = 0.01; %Propably needs to be dynamic
+n = 10;
+% Training loop for single image -> move to function, make it work with
+% different images for input
+for j=1:n
+
+    vData = vectorizeImage(A,28,28);
+    vModel = vData;
+    pHj = arrayfun(@(x)sigmoidCustom(x), b + W*vData);
+    hData = rand(size(pHj))<pHj;
+    hModel = hData;
+    
+    %Gibbs sampling  -> move to function
+for i = 1:k 
 %Random initalization for hidden layer vector h
-h = rand(sizeH,1);
+pHj = arrayfun(@(x)sigmoidCustom(x), b + W*vModel);
+hModel = rand(size(pHj))<pHj;
 
-A = images(:,:,2);
-B = vectorizeImage(A,28,28);
+pVj = arrayfun(@(x)sigmoidCustom(x), a + W'*hModel);
+vModel = rand(size(pVj))<pVj;
+end
 
-
-
-energy(B,h,a,b,W)
-
-%C = reconstructImage(B,28,28);
-
-%figure(1)
-%imshow(A)
-%figure(2)
-%imshow(C)
+%Update Network parameters
+a = a + alpha * (vData-vModel);
+b = b + alpha * (hData-hModel);
+W = W + alpha * (kron(hData,vData')-kron(hModel,vModel'));
 
 
+end
+pVH = prod(pHj)
+pHV = prod(pVj)
 
-%for i=1:length(images(1,1,:))
+
+% Show images (original vs reconstructed)
+figure(1)
+C = reconstructImage(vData,28,28);
+imshow(C)
+figure(2)
+C = reconstructImage(vModel,28,28);
+imshow(C)
+
+
+%energy(v,pHj,a,b,W)
+
+
 
 
 
 
 %% Functions 
+
+function sigmoidCustom = sigmoidCustom(x)
+sigmoidCustom = 1/(1+arrayfun(@(x)exp(-x),x));
+end
 
 %% Calculate Energy from vector
 function energy = energy(x,h,a,b,W) %input Vector, hidden layer Vector, input bias, hidden layer Bias, exchange Matrix W
