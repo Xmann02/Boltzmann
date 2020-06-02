@@ -3,22 +3,83 @@
 
 %% Global parameters
 
-sizeH = 500; %size of the h-vector
+sizeH = 2000; %size of the h-vector
+alpha = 0.1 %learning rate
+n = 1000 % number of images in training routine
+k = 20 %number of iterations of gibbs sample
 
 
 %% Load data set
 [images, labels] = mnist_parse('train-images.idx3-ubyte','train-labels.idx1-ubyte');
 
 
-%% Convert to binary
+%% Image preparation
 
 %Simple cutoff
 images = (images > 120);
-%imshow(images(:,:,2)) %test to see effect on image
+
+%ooooorrrrr
+%image in grayscale
+%images = double(images)/255;
+
+
+%imshow(images(:,:,50)) %test to see effect on image
+
+
+%% initialization
+[a,b,W] = ini(images,sizeH);
+
+%% Working/Testing area
+
+
+% Temporary 
+%A = images(:,:,1);
+%v = vectorizeImage(A,28,28);
+
+for j=1:n
+j    
+
+%use this to train network for specific number, needs to be removed later
+if labels(j)==8
+A = images(:,:,j);
+[a,b,W] = trainingStep(A,a,b,W,alpha,k);  
+end    
+  
+
+
+end
+%pVH = prod(pHj)
+%pHV = prod(pVj)
+
+
+% Show images (original vs reconstructed)
+figure(1)
+A = images(:,:,1);
+v = vectorizeImage(A,28,28);
+imshow(A)
+figure(2)
+%v = rand(28*28,1);
+%sample an image to generate new sample
+[pVj,pHj] = GibbsSample(v,a,b,W,500);
+v = pVj > rand(28*28,1);
+A = reconstructImage(v,28,28);
+imshow(A)
+
+
+
+%energy(v,pHj,a,b,W)
+
+
+
+
+
+
+%% Functions 
 
 
 %% Initialization values 
-
+function [a,b,W] = ini(images,sizeH)
+disp("initalizing Parameters ...");
 %Get sizes of dataset
 imageSize = size(images(:,:,1));
 imageNumber = length(images(1,1,:));
@@ -34,66 +95,49 @@ a = normrnd(0,initalizationInputBiasSigma,[imageSize(1)*imageSize(2),1]);
 
 %Zero initialization for hidden layer bias vector
 b = zeros(sizeH,1);
+disp("Done")
+end
 
+%% Do training step on sample image
 
+function [a,b,W] = trainingStep(image,a,b,W,alpha,k)
 
-%% Working/Testing area
-
-
-% Temporary 
-A = images(:,:,1);
-v = vectorizeImage(A,28,28);
-k = 1;
-alpha = 0.01; %Propably needs to be dynamic
-n = 10;
-% Training loop for single image -> move to function, make it work with
-% different images for input
-for j=1:n
-
-    vData = vectorizeImage(A,28,28);
-    vModel = vData;
-    pHj = arrayfun(@(x)sigmoidCustom(x), b + W*vData);
-    hData = rand(size(pHj))<pHj;
-    hModel = hData;
+vData = vectorizeImage(image,28,28);
+vModel = vData;
+pHjData = arrayfun(@(x)sigmoidCustom(x), b + W*vData);
+pHj = pHjData;
+hData = rand(size(pHj))<pHj;
+hModel = hData;
     
-    %Gibbs sampling  -> move to function
-for i = 1:k 
+[pVj,pHj] = GibbsSample(vData,a,b,W,k);    
+
+
+
+%Update Network parameters
+a = a + alpha * (vData-pVj);
+b = b + alpha * (pHjData-pHj);
+W = W + alpha * (kron(pHjData,vData')-kron(pHj,pVj'));
+end
+
+
+
+
+%% Calculate a gibbs sample
+%input vector from data, biases for visible/hidden layer, interaction
+%Matrix, num iterations
+%Returns propability vectors for v and h
+function [pVj,pHj] = GibbsSample(vData,a,b,W,k) 
+vModel = vData;
+for i=1:k
 %Random initalization for hidden layer vector h
 pHj = arrayfun(@(x)sigmoidCustom(x), b + W*vModel);
 hModel = rand(size(pHj))<pHj;
 
 pVj = arrayfun(@(x)sigmoidCustom(x), a + W'*hModel);
 vModel = rand(size(pVj))<pVj;
-end
-
-%Update Network parameters
-a = a + alpha * (vData-vModel);
-b = b + alpha * (hData-hModel);
-W = W + alpha * (kron(hData,vData')-kron(hModel,vModel'));
-
+end    
 
 end
-pVH = prod(pHj)
-pHV = prod(pVj)
-
-
-% Show images (original vs reconstructed)
-figure(1)
-C = reconstructImage(vData,28,28);
-imshow(C)
-figure(2)
-C = reconstructImage(vModel,28,28);
-imshow(C)
-
-
-%energy(v,pHj,a,b,W)
-
-
-
-
-
-
-%% Functions 
 
 function sigmoidCustom = sigmoidCustom(x)
 sigmoidCustom = 1/(1+arrayfun(@(x)exp(-x),x));
