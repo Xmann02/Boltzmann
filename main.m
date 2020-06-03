@@ -4,9 +4,9 @@
 %% Global parameters
 
 sizeH = 2000; %size of the h-vector
-alpha = 0.1 %learning rate
-n = 1000 % number of images in training routine
-k = 20 %number of iterations of gibbs sample
+alpha = 0.001 %learning rate
+n = 10000 % number of images in training routine
+k = 50 %number of iterations of gibbs sample
 
 
 %% Load data set
@@ -16,18 +16,19 @@ k = 20 %number of iterations of gibbs sample
 %% Image preparation
 
 %Simple cutoff
-images = (images > 120);
+%images = (images > 120);
 
 %ooooorrrrr
 %image in grayscale
-%images = double(images)/255;
+images = double(images)/255;
 
 
 %imshow(images(:,:,50)) %test to see effect on image
 
 
 %% initialization
-[a,b,W] = ini(images,sizeH);
+%[a,b,W] = ini(images,sizeH);
+
 
 %% Working/Testing area
 
@@ -36,14 +37,15 @@ images = (images > 120);
 %A = images(:,:,1);
 %v = vectorizeImage(A,28,28);
 
+%Training Loop
 for j=1:n
 j    
-
+%alpha = 1/(100+j/10);
 %use this to train network for specific number, needs to be removed later
-if labels(j)==8
-A = images(:,:,j);
+%if labels(j)==4
+A = images(:,:,randi([1,50000],1,1));
 [a,b,W] = trainingStep(A,a,b,W,alpha,k);  
-end    
+%end    
   
 
 
@@ -52,18 +54,22 @@ end
 %pHV = prod(pVj)
 
 
-% Show images (original vs reconstructed)
+
+%Plotting
 figure(1)
-A = images(:,:,1);
+for i=1:16
+subplot(4,8,2*i-1)
+A = images(:,:,randi([50000,60000],1,1));
 v = vectorizeImage(A,28,28);
 imshow(A)
-figure(2)
+subplot(4,8,2*i)
 %v = rand(28*28,1);
 %sample an image to generate new sample
-[pVj,pHj] = GibbsSample(v,a,b,W,500);
-v = pVj > rand(28*28,1);
-A = reconstructImage(v,28,28);
+[pVj,pHj] = GibbsSample(v,a,b,W,50);
+%v = pVj > rand(28*28,1);
+A = reconstructImage(pVj,28,28);
 imshow(A)
+end    
 
 
 
@@ -95,6 +101,11 @@ a = normrnd(0,initalizationInputBiasSigma,[imageSize(1)*imageSize(2),1]);
 
 %Zero initialization for hidden layer bias vector
 b = zeros(sizeH,1);
+
+a = gpuArray(a);
+b = gpuArray(b);
+W = gpuArray(W);
+
 disp("Done")
 end
 
@@ -102,12 +113,11 @@ end
 
 function [a,b,W] = trainingStep(image,a,b,W,alpha,k)
 
-vData = vectorizeImage(image,28,28);
-vModel = vData;
-pHjData = arrayfun(@(x)sigmoidCustom(x), b + W*vData);
-pHj = pHjData;
-hData = rand(size(pHj))<pHj;
-hModel = hData;
+vData = gpuArray(vectorizeImage(image,28,28));
+pHjData = gpuArray(1./(1+arrayfun(@(x)exp(-x), b + W*vData)));
+%pHj = pHjData;
+%hData = gpuArray(rand(size(pHj))<pHj);
+
     
 [pVj,pHj] = GibbsSample(vData,a,b,W,k);    
 
@@ -127,20 +137,21 @@ end
 %Matrix, num iterations
 %Returns propability vectors for v and h
 function [pVj,pHj] = GibbsSample(vData,a,b,W,k) 
-vModel = vData;
+vModel = gpuArray(vData);
 for i=1:k
-%Random initalization for hidden layer vector h
-pHj = arrayfun(@(x)sigmoidCustom(x), b + W*vModel);
-hModel = rand(size(pHj))<pHj;
+pHj = gpuArray(1./(1+arrayfun(@(x)exp(-x), b + W*vModel)));
+hModel = gpuArray(rand(size(pHj))<pHj);
 
-pVj = arrayfun(@(x)sigmoidCustom(x), a + W'*hModel);
-vModel = rand(size(pVj))<pVj;
+pVj = gpuArray(1./(1+arrayfun(@(x)exp(-x), a + W'*hModel)));
+vModel = gpuArray(rand(size(pVj))<pVj);
 end    
 
 end
 
+%% Function to calculate sigmoid function
+% Not used, because it is incompatible with gpu computing
 function sigmoidCustom = sigmoidCustom(x)
-sigmoidCustom = 1/(1+arrayfun(@(x)exp(-x),x));
+sigmoidCustom = 1./(1+arrayfun(@(x)exp(-x),x));
 end
 
 %% Calculate Energy from vector
