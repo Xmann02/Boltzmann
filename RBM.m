@@ -22,24 +22,25 @@ vidOpt.numGibbsIterations = 500;
 
 funs = iniFunctions(prop);
 
-
-
-
 % Image preparation
 
 [images,labels] = prepareTrainingData(prop);
 
-
 % initialization
+%load or initialize values, note loading will overwrite set Global
+%parameters
 [a,b,W] = ini(images,prop.sizeH);
 %[a,b,W,prop] = loadNetwork(3);
 
 
 
-% Working area
+%Working area
+%Train network or create video of training
 %[a,b,W] = trainNetwork(images,a,b,W,prop,funs);
 
 [a,b,W] = TrainingVideo(images,a,b,W,prop,funs);
+
+%Create video of gibbs sample
 GibbsSampleVideo(vectorizeImage(images(:,:,5),28,28),a,b,W,vidOpt);
 
 
