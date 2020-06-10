@@ -1,7 +1,7 @@
 %Programm by Xmann02 and DontStealMyAccount
 %
 
-%% Global parameters
+% Global parameters
 
 prop.sizeH = 2000; %size of the h-vector
 prop.startLearningRate = 0.01; %learning rate
@@ -13,10 +13,16 @@ prop.gibbsSampleInput = 'Sample'; %options: 'Sample', 'Random' NOT YET IMPLEMENT
 prop.regularizer = 'L2'; %reguarlizer options: 'None', 'L1', L2' 
 prop.regularizerLambda = 0.0001; %regularizer Lambda 
 prop.imageType = 'Grayscale'; %options: 'Grayscale', 'BW' 
-prop.imageSamples = '4'; %options: 'All' or any single digit 
+prop.imageSamples = 'All'; %options: 'All' or any single digit 
 prop.trainingPercentage = 0.8; %percentage of data used for training
 
+% Options for video Generation
+vidOpt.numGibbsIterations = 500;
+
+
 funs = iniFunctions(prop);
+
+
 
 
 % Image preparation
@@ -31,7 +37,10 @@ funs = iniFunctions(prop);
 
 
 % Working area
-[a,b,W] = trainNetwork(images,a,b,W,prop,funs);
+%[a,b,W] = trainNetwork(images,a,b,W,prop,funs);
+
+[a,b,W] = TrainingVideo(images,a,b,W,prop,funs);
+GibbsSampleVideo(vectorizeImage(images(:,:,5),28,28),a,b,W,vidOpt);
 
 
 % Save Network
@@ -45,6 +54,64 @@ plotSamples(images,a,b,W,prop,funs);
 
 
 %% Functions 
+
+%% Functions for video making
+
+function [a,b,W] = TrainingVideo(images,a,b,W,prop,funs)
+v = VideoWriter('TrainingVideo.avi');
+open(v);
+%Training Loop
+for j=1:prop.numTrainingImages
+j    
+image = images(:,:,randi([1,round(prop.trainingPercentage * length(images))],1,1));
+vData = gpuArray(vectorizeImage(image,28,28));
+pHjData = gpuArray(1./(1+arrayfun(@(x)exp(-x), b + W*vData)));
+%pHj = pHjData;
+%hData = gpuArray(rand(size(pHj))<pHj);
+[pVj,pHj] = funs.gibbsSample(vData,a,b,W,prop);    
+%Update Network parameters
+[a,b,W] = funs.updateNetwork(a,b,W,vData,pVj,pHjData,pHj,prop);
+prop.learningRate = prop.startLearningRate*(1-j/prop.numTrainingImages) + prop.endLearningRage*j/prop.numTrainingImages; 
+
+subplot(1,2,1)
+imshow(image);
+subplot(1,2,2)
+imshow(reconstructImage(pVj,28,28));
+frame = getframe(gcf);
+writeVideo(v,frame);
+
+end
+
+close(v);
+
+end
+
+function GibbsSampleVideo(vData,a,b,W,prop)
+v = VideoWriter('GibbsSample.avi');
+open(v);
+vModel = gpuArray(vData);
+for i=1:prop.numGibbsIterations
+pHj = gpuArray(1./(1+arrayfun(@(x)exp(-x), b + W*vModel)));
+hModel = gpuArray(rand(size(pHj))<pHj);
+
+pVj = gpuArray(1./(1+arrayfun(@(x)exp(-x), a + W'*hModel)));
+vModel = gpuArray(rand(size(pVj))<pVj);
+
+subplot(1,3,1);
+imshow(reconstructImage(vData,28,28));
+subplot(1,3,2);
+imshow(reconstructImage(pVj,28,28));
+subplot(1,3,3);
+imshow(reconstructImage(vModel,28,28));
+
+frame = getframe(gcf);
+writeVideo(v,frame);
+
+end    
+
+close(v);
+
+end
 
 %% initialize functions
 function funs = iniFunctions(prop)
@@ -92,7 +159,6 @@ imshow(A)
 end    
 end
 
-
 %% Training loop
 
 function [a,b,W] = trainNetwork(images,a,b,W,prop,funs)
@@ -100,9 +166,7 @@ function [a,b,W] = trainNetwork(images,a,b,W,prop,funs)
 %Training Loop
 for j=1:prop.numTrainingImages
 j    
-%alpha = 1/(100+j/10);
-%use this to train network for specific number, needs to be removed later
-%if labels(j)==4
+
 A = images(:,:,randi([1,round(prop.trainingPercentage * length(images))],1,1));
 [a,b,W] = trainingStep(A,a,b,W,prop,funs);  
 prop.learningRate = prop.startLearningRate*(1-j/prop.numTrainingImages) + prop.endLearningRage*j/prop.numTrainingImages;
@@ -110,7 +174,6 @@ prop.learningRate = prop.startLearningRate*(1-j/prop.numTrainingImages) + prop.e
 
 end
 end
-
 
 %% image preparation
 function [images,labels] = prepareTrainingData(prop)
@@ -134,7 +197,6 @@ if ~strcmp(prop.imageSamples,'All')
 end    
 
 end
-
 
 %% saving and loading trained networks
 function saveNetwork(a,b,W,prop)
@@ -166,7 +228,6 @@ W = W.W;
 prop = prop.prop
 
 end
-
 
 %% Initialization values 
 function [a,b,W] = ini(images,sizeH)
@@ -229,7 +290,6 @@ b = b + prop.learningRate * (pHjData-pHj);
 W = W + prop.learningRate * (kron(pHjData,vData')-kron(pHj,pVj')) - 2 * prop.regularizerLambda * W ;
 end
 
-
 %% Calculate a gibbs sample
 %input vector from data, biases for visible/hidden layer, interaction
 %Matrix, num iterations
@@ -258,7 +318,6 @@ end
 
 end
 
-
 %% Function to calculate sigmoid function
 % Not used, because it is incompatible with gpu computing
 function sigmoidCustom = sigmoidCustom(x)
@@ -269,7 +328,6 @@ end
 function energy = energy(x,h,a,b,W) %input Vector, hidden layer Vector, input bias, hidden layer Bias, exchange Matrix W
 energy = -h'*W*x-a'*x-b'*h;
 end
-
 
 %% Reshape image to vector
 function vectorX = vectorizeImage(image,sizeX,sizeY)
