@@ -3,21 +3,23 @@
 
 % Global parameters
 
-prop.sizeH = 2000; %size of the h-vector
+prop.sizeH = 200; %size of the h-vector
+prop.learningRate = 0.01
 prop.startLearningRate = 0.01; %learning rate
-prop.endLearningRage = 0.001; %
-prop.numTrainingImages = 1000; % number of images in training routine
+prop.endLearningRate = 0.001; %
+prop.numTrainingImages = 10000; % number of images in training routine
+prop.gibbsSampleInputNoise = 0.0; % Overlay starting sample for gibbs sample with noise options: [0:1]
 prop.numGibbsIterations = 50; %number of iterations of gibbs sample
 prop.gibbsSampleType = 'Propability'; % options 'Reconstruct', 'Propability'
-prop.gibbsSampleInput = 'Sample'; %options: 'Sample', 'Random' NOT YET IMPLEMENTED
-prop.regularizer = 'L2'; %reguarlizer options: 'None', 'L1', L2' 
+prop.regularizer = 'None'; %reguarlizer options: 'None', 'L1', L2' 
 prop.regularizerLambda = 0.0001; %regularizer Lambda 
 prop.imageType = 'Grayscale'; %options: 'Grayscale', 'BW' 
-prop.imageSamples = 'All'; %options: 'All' or any single digit 
+prop.imageSamples = '4'; %options: 'All' or any single digit 
 prop.trainingPercentage = 0.8; %percentage of data used for training
 
 % Options for video Generation
 vidOpt.numGibbsIterations = 500;
+vidOpt.gibbsSampleInputNoise = 0.2;
 
 
 funs = iniFunctions(prop);
@@ -29,24 +31,26 @@ funs = iniFunctions(prop);
 % initialization
 %load or initialize values, note loading will overwrite set Global
 %parameters
-[a,b,W] = ini(images,prop.sizeH);
+%[a,b,W] = ini(images,prop.sizeH);
 %[a,b,W,prop] = loadNetwork(3);
 
 
 
 %Working area
 %Train network or create video of training
-%[a,b,W] = trainNetwork(images,a,b,W,prop,funs);
+[a,b,W] = trainNetwork(images,a,b,W,prop,funs);
 
-[a,b,W] = TrainingVideo(images,a,b,W,prop,funs);
+%[a,b,W] = TrainingVideo(images,a,b,W,prop,funs);
 
 %Create video of gibbs sample
-GibbsSampleVideo(vectorizeImage(images(:,:,5),28,28),a,b,W,vidOpt);
+%GibbsSampleVideo(vectorizeImage(images(:,:,5),28,28),a,b,W,vidOpt);
 
 
 % Save Network
 %saveNetwork(a,b,W,prop);
 
+%Plot layers of network and biases
+plotNetwork(a,b,W);
 
 % Show Samples
 plotSamples(images,a,b,W,prop,funs);
@@ -55,6 +59,25 @@ plotSamples(images,a,b,W,prop,funs);
 
 
 %% Functions 
+
+%% Functions for seeing what W,a,b do
+function plotNetwork(a,b,W)
+figure(8);
+subplot(4,8,1);
+A = reconstructImage((a-min(a))/max(abs(a-min(a))),28,28);
+imshow(A);
+subplot(4,8,2);
+B = reconstructImage((W'*b-min(W'*b))/max(W'*b-min(W'*b)),28,28);
+imshow(B);
+for i=3:32
+subplot(4,8,i);
+w = reconstructImage((W(i,:)-min(W(:,:))/max(abs(W(:,:)-min(W(:,:))))),28,28);
+imshow(w);
+end
+
+
+end
+
 
 %% Functions for video making
 
@@ -67,16 +90,19 @@ j
 image = images(:,:,randi([1,round(prop.trainingPercentage * length(images))],1,1));
 vData = gpuArray(vectorizeImage(image,28,28));
 pHjData = gpuArray(1./(1+arrayfun(@(x)exp(-x), b + W*vData)));
+gibbsStart = vData * (1-prop.gibbsSampleInputNoise) + prop.gibbsSampleInputNoise * rand(size(vData));
 %pHj = pHjData;
 %hData = gpuArray(rand(size(pHj))<pHj);
-[pVj,pHj] = funs.gibbsSample(vData,a,b,W,prop);    
+[pVj,pHj] = funs.gibbsSample(gibbsStart,a,b,W,prop);    
 %Update Network parameters
 [a,b,W] = funs.updateNetwork(a,b,W,vData,pVj,pHjData,pHj,prop);
-prop.learningRate = prop.startLearningRate*(1-j/prop.numTrainingImages) + prop.endLearningRage*j/prop.numTrainingImages; 
+prop.learningRate = prop.startLearningRate*exp(log(prop.startLearningRate)*(1-j)/prop.numTrainingImages + log(prop.endLearningRate)*j/prop.numTrainingImages); 
 
-subplot(1,2,1)
+subplot(1,3,1)
 imshow(image);
-subplot(1,2,2)
+subplot(1,3,2)
+imshow(reconstructImage(gibbsStart,28,28));
+subplot(1,3,3)
 imshow(reconstructImage(pVj,28,28));
 frame = getframe(gcf);
 writeVideo(v,frame);
@@ -90,7 +116,8 @@ end
 function GibbsSampleVideo(vData,a,b,W,prop)
 v = VideoWriter('GibbsSample.avi');
 open(v);
-vModel = gpuArray(vData);
+gibbsStart = vData * (1-prop.gibbsSampleInputNoise) + prop.gibbsSampleInputNoise * rand(size(vData));
+vModel = gpuArray(gibbsStart);
 for i=1:prop.numGibbsIterations
 pHj = gpuArray(1./(1+arrayfun(@(x)exp(-x), b + W*vModel)));
 hModel = gpuArray(rand(size(pHj))<pHj);
@@ -98,11 +125,13 @@ hModel = gpuArray(rand(size(pHj))<pHj);
 pVj = gpuArray(1./(1+arrayfun(@(x)exp(-x), a + W'*hModel)));
 vModel = gpuArray(rand(size(pVj))<pVj);
 
-subplot(1,3,1);
+subplot(1,4,1);
 imshow(reconstructImage(vData,28,28));
-subplot(1,3,2);
+subplot(1,4,2);
+imshow(reconstructImage(gibbsStart,28,28));
+subplot(1,4,3);
 imshow(reconstructImage(pVj,28,28));
-subplot(1,3,3);
+subplot(1,4,4);
 imshow(reconstructImage(vModel,28,28));
 
 frame = getframe(gcf);
@@ -143,6 +172,7 @@ figure(1)
 for i=1:16
 subplot(4,8,2*i-1)
 A = images(:,:,randi([round(prop.trainingPercentage * length(images)),round(length(images))],1,1));
+A = A * (1-prop.gibbsSampleInputNoise) + prop.gibbsSampleInputNoise * rand(size(A));
 v = vectorizeImage(A,28,28);
 imshow(A)
 subplot(4,8,2*i)
@@ -170,7 +200,7 @@ j
 
 A = images(:,:,randi([1,round(prop.trainingPercentage * length(images))],1,1));
 [a,b,W] = trainingStep(A,a,b,W,prop,funs);  
-prop.learningRate = prop.startLearningRate*(1-j/prop.numTrainingImages) + prop.endLearningRage*j/prop.numTrainingImages;
+prop.learningRate = prop.startLearningRate*exp(log(prop.startLearningRate)*(1-j)/prop.numTrainingImages + log(prop.endLearningRate)*j/prop.numTrainingImages);
 %end    
 
 end
@@ -265,8 +295,8 @@ pHjData = gpuArray(1./(1+arrayfun(@(x)exp(-x), b + W*vData)));
 %pHj = pHjData;
 %hData = gpuArray(rand(size(pHj))<pHj);
 
-    
-[pVj,pHj] = funs.gibbsSample(vData,a,b,W,prop);    
+gibbsStart = vData * (1-prop.gibbsSampleInputNoise) + prop.gibbsSampleInputNoise * rand(size(vData));    
+[pVj,pHj] = funs.gibbsSample(gibbsStart,a,b,W,prop);    
 
 %Update Network parameters
 [a,b,W] = funs.updateNetwork(a,b,W,vData,pVj,pHjData,pHj,prop);
