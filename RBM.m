@@ -5,14 +5,14 @@
 
 prop.sizeH = 200; %size of the h-vector
 prop.learningRate = 0.01
-prop.startLearningRate = 0.01; %learning rate
-prop.endLearningRate = 0.001; %
-prop.numTrainingImages = 10000; % number of images in training routine
+prop.startLearningRate = 0.0001; %learning rate
+prop.endLearningRate = 0.00001; %
+prop.numTrainingImages = 250000; % number of images in training routine
 prop.gibbsSampleInputNoise = 0.0; % Overlay starting sample for gibbs sample with noise options: [0:1]
 prop.numGibbsIterations = 50; %number of iterations of gibbs sample
 prop.gibbsSampleType = 'Propability'; % options 'Reconstruct', 'Propability'
-prop.regularizer = 'None'; %reguarlizer options: 'None', 'L1', L2' 
-prop.regularizerLambda = 0.0001; %regularizer Lambda 
+prop.regularizer = 'L2'; %reguarlizer options: 'None', 'L1', L2' 
+prop.regularizerLambda = 0.000001; %regularizer Lambda 
 prop.imageType = 'Grayscale'; %options: 'Grayscale', 'BW' 
 prop.imageSamples = '4'; %options: 'All' or any single digit 
 prop.trainingPercentage = 0.8; %percentage of data used for training
@@ -47,7 +47,7 @@ funs = iniFunctions(prop);
 
 
 % Save Network
-%saveNetwork(a,b,W,prop);
+saveNetwork(a,b,W,prop);
 
 %Plot layers of network and biases
 plotNetwork(a,b,W);
