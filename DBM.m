@@ -1,20 +1,29 @@
 %Programm by Xmann02 and DontStealMyAccount
 %
 
+function DBM(gpuID)
+
+gpuID=gpuID+1; % Important! Transfers Grid engine counting 0,1,2,... to Matlab counting 1,2,3,....
+info.gpu=gpuDevice(gpuID); % Chooses the GPU 
+info.gpuCount=gpuDeviceCount; % Number of GPUs in the system, just for info
+gpurng('shuffle'); % random number generator initialised randomly. Important if one uses a random number generator 
+maxNumCompThreads(1); % Restrict number of CPU cores to 1
+
+
 % Global parameters
-prop.netDepth = 3;
-prop.size = [400,200,100]; %size of the h-vector
-prop.learningRate = 0.01
-prop.startLearningRate = 0.001; %learning rate
+prop.netDepth = 2;
+prop.size = [200,100]; %size of the h-vector
+prop.learningRate = 0.001
+prop.startLearningRate = 0.01; %learning rate
 prop.endLearningRate = 0.0001; %
-prop.numTrainingImages = 1000; % number of images in training routine
+prop.numTrainingImages = 1000000; % number of images in training routine
 prop.gibbsSampleInputNoise = 0.0; % Overlay starting sample for gibbs sample with noise options: [0:1]
-prop.numGibbsIterations = 10; %number of iterations of gibbs sample
+prop.numGibbsIterations = 500; %number of iterations of gibbs sample
 prop.gibbsSampleType = 'Propability'; % options 'Reconstruct', 'Propability'
 prop.regularizer = 'None'; %reguarlizer options: 'None', 'L1', L2' 
-prop.regularizerLambda = 0.0001; %regularizer Lambda 
-prop.imageType = 'Grayscale'; %options: 'Grayscale', 'BW' 
-prop.imageSamples = '8'; %options: 'All' or any single digit 
+prop.regularizerLambda = 0.0; %regularizer Lambda 
+prop.imageType = 'BW'; %options: 'Grayscale', 'BW' 
+prop.imageSamples = 'All'; %options: 'All' or any single digit 
 prop.trainingPercentage = 0.8; %percentage of data used for training
 
 % Options for video Generation
@@ -23,28 +32,30 @@ vidOpt.numGibbsIterations = 500;
 vidOpt.gibbsSampleInputNoise = 0.0;
 
 
-funs = iniFunctions(prop);
 
 % Image preparation
 
 [images,labels] = prepareTrainingData(prop);
+
+funs = iniFunctions(prop);
+
 
 % initialization
 %load or initialize values, note loading will overwrite set Global
 %parameters
 
 %net = ini(images,prop);
-%[net,prop] = loadNetwork(2); 
+[net,prop] = loadNetwork(1); 
 
 
 
 %Working area
 %Train network or create video of training
-net = preTrainNetwork(images,net,prop,funs);
-net = deepTraining(images,net,prop,funs);
+%net = preTrainNetwork(images,net,prop,funs);
+%net = deepTraining(images,net,prop,funs);
 
 
-net = deepTrainingVideo(images,net,prop,funs); 
+%net = deepTrainingVideo(images,net,prop,funs); 
 %GibbsSampleVideo(vectorizeImage(images(:,:,1),28,28),net,vidOpt);
 %Create video of gibbs sample
 
@@ -61,7 +72,7 @@ plotNetwork(net);
 plotSamples(images,net,prop,funs); 
 
 
-
+end
 
 %% Functions 
 
@@ -241,7 +252,7 @@ for i=1:prop.numGibbsIterations
      model.layer(j).prop = (1./(1+arrayfun(@(x)exp(-x), net.layer(j).a + net.layer(j).W'*model.layer(j+1).prop)));   
      end
      
-vModel = gpuArray(rand(size(model.layer(1).prop))<model.layer(1).prop);    
+vModel = 120/255<model.layer(1).prop;    
     
 
 subplot(1,4,1);
@@ -299,7 +310,7 @@ subplot(4,8,2*i)
 %sample an image to generate new sample
 model = deepGibbsSample(v,net,prop);
 if strcmp(prop.imageType,'BW')
-    v = model.layer(1).prop > rand(28*28,1);
+    v = model.layer(1).prop > 120/255;
     A = reconstructImage(v,28,28);
 end    
 if strcmp(prop.imageType,'Grayscale')
