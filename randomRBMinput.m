@@ -1,36 +1,25 @@
 
 function randomRBMinput(gpuID)
 
-%Options for RBM
- 
-
-% %Optins for Network
-% prop.sizeH = 200; %size of the h-vector
-% 
-% %Options for Training
-% prop.numEpochs = 1;
-% prop.learningRates = [0.05];
-% prop.numTrainingImages = 60000; % number of images in training epoch optimally at 60000 (all Images)
-% prop.gibbsSampleCD = 'CDP'; %options 'CD', 'CDP'
-% prop.numGibbsIterations = 1; %number of iterations of gibbs sample
-% prop.regularizer = 'L2'; %reguarlizer options: 'None', 'L1', L2'
-% prop.regularizerLambdas = prop.learningRates*0.05; %regularizer Lambda
-% prop.dropoutPropability = 0.5;
-% 
-% prop.gibbsSampleInputNoise = 0.0; % Overlay starting sample for gibbs sample with noise options: [0:1]
+%Generate Random options for training RBM 
+%Run Program from here or static RBMinput 
 
 
 for num=1:5
     
+    %% size of the h-vector
     k=10000;
     while(k>700||k<5)
         k = round(10^normrnd(2,1)); 
     end
     
-    prop.sizeH = k; %size of the h-vector
+    prop.sizeH = k; 
+    
+    %% Number of epochs
+    
     prop.numEpochs = randi([1 10],1,1);
     
-    
+    %% Learning Rate
     
     k=10000;
     while(k>1||k<1e-3)
@@ -45,6 +34,7 @@ for num=1:5
         b = rand()*prop.numEpochs;
     end
     
+    %% Learning Rate
     
     prop.learningRates = k*ones(prop.numEpochs,1);
     for c=round(b):prop.numEpochs
@@ -52,6 +42,8 @@ for num=1:5
     end 
     
     prop.numTrainingImages = 60000;
+    
+    %% CD-n or PCD-n
     
     d = randi([1 2]);
     if(d==1)
@@ -61,6 +53,7 @@ for num=1:5
         prop.gibbsSampleCD = 'CDP';
     end
     
+    %% Number of gibbs iterations per step
     
     f=10000;
     while(f>500||f<1)
@@ -69,6 +62,7 @@ for num=1:5
     
     prop.numGibbsIterations = f;
     
+    %% Regularizer type
     
     g = randi([1 3]);
     if(g==1)
@@ -81,12 +75,16 @@ for num=1:5
         prop.regularizer = 'L2';
     end
     
+    %% Regularizer lambda
+    
     h=1;
     while(h>0.01||h<0)
         h = 10^normrnd(-2.3,0.8); 
     end
     
     prop.regularizerLambdas = prop.learningRates*h;
+    
+    %% Dropout
     
     j= 100;
     while(j>0.5||j<0)
@@ -100,17 +98,19 @@ for num=1:5
         m = normrnd(0.5,0.5);
     end
     
+    %% Input noise (deactivated for random input)
+    
     prop.gibbsSampleInputNoise = 0.0;
     
     %Options for Training Data
     prop.imageType = 'BW'; %options: 'Grayscale', 'BW'
     prop.imageSamples = 'All'; %options: 'All' or any single digit
     
-    prop
+    
     disp(strcat('Inital Learning Rate ',num2str(k)));
     disp(strcat('Learning Rate Reduction ',num2str(a)));
     disp(strcat('Lambda/Learning Rate ',num2str(h)));
-    RBM(gpuID,prop);
+    RBM(gpuID,prop); %Main Program
     
 end
 
