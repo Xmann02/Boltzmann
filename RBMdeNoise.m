@@ -38,12 +38,12 @@ saveNetwork(net,prop);  %Save network, else will be lost
 
 %Change options for new sample creation
 
-prop.gibbsSampleInputNoise = 0.0; %No noise on input samples
+prop.gibbsSampleInputNoise = 0.1; %Some noise on input samples
 plotNetwork(net);   %Plot layers of weight matrix
 
-%Set CD-n sampling and 100 steps
+%Set CD-n sampling and 2 steps
 prop.gibbsSampleCD = 'CD';  
-prop.numGibbsIterations = 100;
+prop.numGibbsIterations = 2;
 
 %Plot new samples
 plotSamples(testingImages,net,prop,funs);
